@@ -1,10 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Header
 import logging
 import os
 
 from app.services.extractor import extract_text
 from app.services.chunking_service import ChunkingService
-from app.services.embedding_service import HFEmbeddingService
 from app.services.vector_store_service import VectorStoreService
 
 logger = logging.getLogger(__name__)
@@ -15,14 +14,23 @@ router = APIRouter()
 UPLOAD_DIR = "./data"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Initialize services ONCE
-chunker = ChunkingService()
-embedder = HFEmbeddingService()
-vector_store = VectorStoreService()
+# Admin key
+ADMIN_KEY = os.getenv("ADMIN_API_KEY")
 
 
-@router.post("/")
-async def upload_profile(file: UploadFile = File(...)):
+def admin_guard(x_admin_key: str):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Admin access only")
+
+
+@router.post("")
+async def upload_profile(
+    file: UploadFile = File(...),
+    x_admin_key: str = Header(None)
+):
+
+    # Admin check
+    admin_guard(x_admin_key)
 
     filename = file.filename.lower()
 
@@ -31,18 +39,28 @@ async def upload_profile(file: UploadFile = File(...)):
 
     path = f"{UPLOAD_DIR}/{file.filename}"
 
-    with open(path, "wb") as f:
-        f.write(await file.read())
+    try:
+        # Save file
+        with open(path, "wb") as f:
+            f.write(await file.read())
 
-    text = extract_text(path)
+        # Extract text
+        text = extract_text(path)
 
-    chunker = ChunkingService.get_instance()
-    chunks = chunker.chunk(text)
+        # Chunk
+        chunker = ChunkingService.get_instance()
+        chunks = chunker.chunk(text)
 
-    vector_store = VectorStoreService.get_instance()
-    vector_store.store(chunks)
+        # Store vectors
+        vector_store = VectorStoreService.get_instance()
+        vector_store.store(chunks)
 
-    return {
-        "message": "Profile ingested successfully",
-        "chunks": len(chunks)
-    }
+        return {
+            "message": "Profile ingested successfully",
+            "chunks": len(chunks)
+        }
+
+    finally:
+        # cleanup
+        if os.path.exists(path):
+            os.remove(path)

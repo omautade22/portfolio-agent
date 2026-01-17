@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Header
 from groq import Groq
 import os
 from dotenv import load_dotenv
@@ -7,9 +7,11 @@ load_dotenv()
 from app.services.extractor import extract_text
 from app.services.vector_store_service import VectorStoreService
 
-router = APIRouter(prefix="/jd")
+router = APIRouter()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+API_KEY = os.getenv("CHAT_API_KEY")
 
 UPLOAD_DIR = "./jd_uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -25,8 +27,11 @@ def extract_keywords(text: str):
 
 
 @router.post("/match")
-async def match_jd(file: UploadFile = File(...)):
-
+async def match_jd(x_api_key: str = Header(None)  ,file: UploadFile = File(...)):
+    # Validate API key
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
     name = file.filename.lower()
 
     if not name.endswith((".pdf", ".docx")):
@@ -42,7 +47,7 @@ async def match_jd(file: UploadFile = File(...)):
         # extract JD text
         jd_text = extract_text(path)
 
-        # 🔥 FAST SEARCH (no embedding JD)
+        # FAST SEARCH (no embedding JD)
         keywords = extract_keywords(jd_text)
 
         vector_store = VectorStoreService.get_instance()
