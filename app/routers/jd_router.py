@@ -18,16 +18,23 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def extract_keywords(text: str):
-    # simple skill/keyword extraction
-    important = []
-    for word in text.split():
-        if len(word) > 4:
-            important.append(word.lower())
-    return list(set(important))[:15]   # top keywords
+    stopwords = {"with","this","that","have","from","your","will","about"}
+    words = []
+
+    for word in text.lower().split():
+        word = word.strip(",.()")
+        if len(word) > 4 and word not in stopwords:
+            words.append(word)
+
+    return list(set(words))[:15]
+
 
 
 @router.post("/match")
-async def match_jd(x_api_key: str = Header(None)  ,file: UploadFile = File(...)):
+async def match_jd(
+    file: UploadFile = File(...),
+    x_api_key: str = Header(None, alias="x-api-key")
+):
     # Validate API key
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Unauthorized")
