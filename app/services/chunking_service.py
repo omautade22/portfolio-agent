@@ -1,5 +1,4 @@
-from langchain_experimental.text_splitter import SemanticChunker
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 class ChunkingService:
     _instance = None
@@ -11,16 +10,11 @@ class ChunkingService:
         return cls._instance
 
     def __init__(self):
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
-
-        self.chunker = SemanticChunker(
-            embeddings=self.embeddings,
-            breakpoint_threshold_type="percentile"
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=100
         )
 
     def chunk(self, text: str):
-        docs = self.chunker.create_documents([text])
+        docs = self.splitter.create_documents([text])
         return [d.page_content for d in docs]
-    

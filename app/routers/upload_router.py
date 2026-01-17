@@ -4,24 +4,24 @@ import os
 
 from app.services.extractor import extract_text
 from app.services.chunking_service import ChunkingService
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import HFEmbeddingService
 from app.services.vector_store_service import VectorStoreService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-router = APIRouter(prefix="/profile")
+router = APIRouter()
 
 UPLOAD_DIR = "./data"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Initialize services ONCE
 chunker = ChunkingService()
-embedder = EmbeddingService()
+embedder = HFEmbeddingService()
 vector_store = VectorStoreService()
 
 
-@router.post("/upload")
+@router.post("/")
 async def upload_profile(file: UploadFile = File(...)):
 
     filename = file.filename.lower()

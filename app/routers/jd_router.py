@@ -3,6 +3,7 @@ from groq import Groq
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 from app.services.extractor import extract_text
 from app.services.vector_store_service import VectorStoreService
 
@@ -14,40 +15,64 @@ UPLOAD_DIR = "./jd_uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+def extract_keywords(text: str):
+    # simple skill/keyword extraction
+    important = []
+    for word in text.split():
+        if len(word) > 4:
+            important.append(word.lower())
+    return list(set(important))[:15]   # top keywords
+
+
 @router.post("/match")
 async def match_jd(file: UploadFile = File(...)):
 
     name = file.filename.lower()
 
     if not name.endswith((".pdf", ".docx")):
-        raise HTTPException(400, "Only PDF/DOCX")
+        raise HTTPException(400, "Only PDF/DOCX supported")
 
     path = f"{UPLOAD_DIR}/{file.filename}"
 
     try:
+        # save JD
         with open(path, "wb") as f:
             f.write(await file.read())
 
+        # extract JD text
         jd_text = extract_text(path)
 
+        # 🔥 FAST SEARCH (no embedding JD)
+        keywords = extract_keywords(jd_text)
+
         vector_store = VectorStoreService.get_instance()
-        docs = vector_store.search(jd_text, k=8)
+        docs = vector_store.search(" ".join(keywords), k=8)
 
         profile = "\n".join([d.page_content for d in docs])
 
         prompt = f"""
-You are a senior recruiter.
+You are a senior technical recruiter.
 
 PROFILE:
 {profile}
 
-JD:
+JOB DESCRIPTION:
 {jd_text}
 
-Give:
+TASK:
+1. Analyze skill match
+2. Give percentage (0-100)
+3. Classify:
+   - Strong (80+)
+   - Good (60-79)
+   - Partial (40-59)
+   - Weak (<40)
 
-Match Percentage: %
-Verdict:
+Format:
+
+Match Percentage: <number>%
+Verdict: <Strong/Good/Partial/Weak Match>
+
 Why Om is a good fit:
 - bullets
 
@@ -69,8 +94,3 @@ End with:
     finally:
         if os.path.exists(path):
             os.remove(path)
-
-
-if __name__ == "__main__":
-    key = os.getenv("GROQ_API_KEY")
-    print(key)

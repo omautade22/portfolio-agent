@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
+from app.services.embedding_service import HFEmbeddingService
 
 
 class VectorStoreService:
@@ -8,7 +8,7 @@ class VectorStoreService:
 
     @classmethod
     def get_instance(cls):
-        if cls._instance is None:
+        if not cls._instance:
             cls._instance = cls()
         return cls._instance
 
@@ -16,13 +16,12 @@ class VectorStoreService:
         self.persist_dir = "vector_db"
         os.makedirs(self.persist_dir, exist_ok=True)
 
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        # IMPORTANT: pass OBJECT, NOT function
+        self.embedder = HFEmbeddingService()
 
         self.db = Chroma(
             persist_directory=self.persist_dir,
-            embedding_function=self.embeddings
+            embedding_function=self.embedder  # <-- THIS FIXES ERROR
         )
 
     def store(self, chunks):

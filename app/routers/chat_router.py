@@ -1,28 +1,26 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from groq import Groq
 import os
-from dotenv import  load_dotenv
+from dotenv import load_dotenv
 load_dotenv()
 
 from app.services.vector_store_service import VectorStoreService
 
-router = APIRouter(prefix="/chat")
+router = APIRouter()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 API_KEY = os.getenv("CHAT_API_KEY")
 
 
-def validate(request: Request):
-    key = request.headers.get("x-api-key")
-    if key != API_KEY:
-        raise HTTPException(403, "Unauthorized")
-
-
 @router.post("/ask")
-async def chat(request: Request, query: str):
+async def chat(
+    query: str,
+    x_api_key: str = Header(None)   # <-- THIS makes header visible in Swagger
+):
 
-    validate(request)
+    # Validate API key
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
     vector_store = VectorStoreService.get_instance()
     docs = vector_store.search(query, k=5)
